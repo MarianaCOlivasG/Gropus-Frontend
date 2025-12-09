@@ -8,7 +8,7 @@ const LoginForm: React.FC = () => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false); // nuevo estado
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -18,19 +18,25 @@ const LoginForm: React.FC = () => {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    setLoading(true); 
+    setLoading(true);
 
     try {
-      await loginUser(form);
+      const data = await loginUser(form);
+
+      
+      localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("uid", data.user.uid);
+
       setMessage("Inicio de sesión exitoso.");
+
       setTimeout(() => {
-        navigate("/panel"); 
+        navigate("/panel");
       }, 1500);
 
     } catch (err: any) {
       setError(err?.message || "Error al iniciar sesión.");
     } finally {
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
@@ -44,13 +50,13 @@ const LoginForm: React.FC = () => {
       ]}
       onChange={handleChange}
       onSubmit={handleSubmit}
-      submitText={loading ? "Verificando..." : "Ingresar"} 
+      submitText={loading ? "Verificando..." : "Ingresar"}
       message={message}
       error={error}
-      //disabled={loading} // opcional: deshabilitar inputs mientras verifica
     />
   );
 };
 
 export default LoginForm;
+
 

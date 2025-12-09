@@ -22,16 +22,16 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   if (!isOpen || !userKey) return null;
 
   // Tipamos correctamente el acceso al usuario
-  const user: User =
-    users[userKey as keyof typeof users] || {
-      name: "Usuario Desconocido",
-      avatar: "https://i.pravatar.cc/40?img=4",
-      status: "offline",
-      key: userKey,
-    };
+  const user: User = (users as Record<string, User>)[userKey] || {
+    key: userKey,
+    name: "Usuario Desconocido", // Fallback en caso de no encontrarlo
+    avatar: "https://i.pravatar.cc/40?img=0",
+    status: "offline",
+  };
 
   const statusText = user.status === "active" ? "En línea" : "Desconectado";
-  const description = "Sin descripción";
+  // Puedemos obtener los siguientes datos desde el objeto 'user' si los agregamos a `data.ts`
+  const description = "Sin descripción"; 
   const lastLogin = "Hoy --:--";
 
   return (
@@ -47,30 +47,50 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         <button
           id="closeProfileModal"
           onClick={onClose}
-          className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold"
+          className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xl"
         >
-          X
+          &times; {/* Usamos el símbolo 'x' */}
         </button>
 
-        <div className="flex flex-col items-center space-y-3">
-          <img
-            id="profileAvatar"
-            src={user.avatar}
-            className="w-24 h-24 rounded-full"
-            alt="Avatar"
-          />
-          <div className="text-xl font-semibold" id="profileName">
-            {user.name}
+        {/* Banner o Header del perfil */}
+        <div className="h-16 bg-indigo-600 rounded-t-lg mb-10 -m-6"></div>
+
+        {/* Contenido del Perfil */}
+        <div className="flex flex-col items-center -mt-16">
+          {/* Avatar grande */}
+          <div className="relative w-24 h-24 border-4 border-gray-800 rounded-full mb-3">
+            <img
+              src={user.avatar}
+              className="w-full h-full rounded-full"
+              alt={user.name}
+            />
+            {/* Indicador de estado */}
+            <span
+              className={`absolute bottom-0 right-0 w-5 h-5 rounded-full border-4 border-gray-800 ${
+                user.status === "active" ? "bg-green-500" : "bg-gray-500"
+              }`}
+            ></span>
           </div>
-          <div className="text-gray-400 text-sm" id="profileStatus">
-            {statusText}
+
+          {/* Nombre */}
+          <h2 className="text-xl font-bold text-white">{user.name}</h2>
+          <p className="text-sm text-gray-400 mb-4">#{user.key}</p>
+
+          {/* Estado/Información */}
+          <div className="w-full bg-gray-700 p-3 rounded-lg text-sm">
+            <h3 className="text-gray-300 font-semibold mb-2">MIEMBRO DESDE</h3>
+            <p className="text-gray-400">Hace mucho tiempo...</p>
+
+            <h3 className="text-gray-300 font-semibold mt-4 mb-2">
+              ESTADO: {statusText}
+            </h3>
+            <p className="text-gray-400 mb-4 truncate">{description}</p>
           </div>
-          <div className="text-gray-500 text-xs" id="profileDescription">
-            {description}
-          </div>
-          <div className="text-gray-500 text-xs" id="profileLastLogin">
-            Último login: {lastLogin}
-          </div>
+
+          {/* Botón de acción */}
+          <button className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition">
+            Enviar Mensaje
+          </button>
         </div>
       </div>
     </div>

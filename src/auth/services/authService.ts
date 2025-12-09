@@ -52,8 +52,16 @@ export const loginUser = async (formData: LoginForm) => {
     throw new Error("");
   }
 
+  if (data.accessToken) {
+    localStorage.setItem("token", data.accessToken);
+    console.log("Token guardado:", data.accessToken);
+  } else {
+    console.warn("El backend no devolvió accessToken");
+  }
+
   return data;
 };
+
 
 
 

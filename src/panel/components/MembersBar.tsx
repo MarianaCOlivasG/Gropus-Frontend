@@ -1,7 +1,7 @@
 import React from "react";
-import { roles, currentUserKey } from "../data";
+import { roles, currentUserKey } from "../data1";
 
-// 🔹 Tipos auxiliares
+//  Tipos auxiliares
 export interface Member {
   key: string;
   name: string;
@@ -12,7 +12,7 @@ export interface Member {
 export type Role = "admin" | "moderator" | "member" | string;
 export type GroupKey = keyof typeof roles;
 
-// 🔹 Props del componente
+//  Props del componente
 interface MembersBarProps {
   members: Member[];
   groupKey: GroupKey;
