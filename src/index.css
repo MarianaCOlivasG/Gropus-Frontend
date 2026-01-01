@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+/* ------------------------- */
+body {
+  background-color: #202225; /* Fondo general oscuro */
+  color: white; /* Texto base blanco */
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+/* ------------------------ */
+
+/* 1. Ancho */
+::-webkit-scrollbar {
+  width: 6px;  
+  height: 6px;
+}
+
+/* 2. Carril fondo  */
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+/* 3. Barra */
+::-webkit-scrollbar-thumb {
+  background: #4b5563; 
+  border-radius: 10px; 
+}
+
+/* 4. Efecto mouse */
+::-webkit-scrollbar-thumb:hover {
+  background: #9333ea; 
+}

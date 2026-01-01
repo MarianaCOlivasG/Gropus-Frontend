@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-// 1. INTERFAZ DE USUARIO
 interface User {
   id: string;
   name: string;
@@ -14,7 +13,6 @@ interface AddFriendModalProps {
   onAddFriend: (friendName: string) => void;
 }
 
-// 2. DATOS DE USUARIO SIMULADOS
 const ALL_USERS: User[] = [
   { id: 'user1', name: 'America', tag: '#1234', avatar: 'https://i.pravatar.cc/40?img=29' },
   { id: 'user2', name: 'Bill', tag: '#5678', avatar: 'https://i.pravatar.cc/150?img=12' },
@@ -27,7 +25,7 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose, onAddF
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // 3. BÚSQUEDA COMO VALOR CALCULADO
+  // BÚSQUEDA COMO VALOR CALCULADO
   const term = searchTerm.toLowerCase().trim();
 
   const filteredUsers = term.length >= 2
@@ -37,12 +35,12 @@ const AddFriendModal: React.FC<AddFriendModalProps> = ({ isOpen, onClose, onAddF
       ).slice(0, 5)
     : [];
 
-  // 4. Lógica de selección exacta
+  // Lógica de selección exacta
   const exactMatch = ALL_USERS.find(user =>
     (user.name.toLowerCase() + user.tag).includes(term)
   );
 
-  // 5. Función de reseteo
+  // Función de reseteo
   const handleClose = () => {
     setSearchTerm('');
     setSelectedUser(null);

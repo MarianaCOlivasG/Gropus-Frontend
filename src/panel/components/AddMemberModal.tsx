@@ -1,47 +1,36 @@
 import React, { useState, useEffect } from "react";
-import type { GroupKey, Member } from "../data1";
-
-// Interfaz básica de Friend para el listado
-interface FriendListItem {
-  key: string;
-  name: string;
-  avatar: string;
-}
+import { useChatStore } from "../../store/useChatStore";
 
 interface AddMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentGroupKey: GroupKey;
-  friendsList: FriendListItem[];
-  groupMembers: Member[];
-  onAddMembers: (selectedMemberKeys: string[], groupKey: GroupKey) => void;
 }
 
 const AddMemberModal: React.FC<AddMemberModalProps> = ({
   isOpen,
   onClose,
-  currentGroupKey,
-  friendsList,
-  groupMembers,
-  onAddMembers,
 }) => {
-  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
-  const [availableFriends, setAvailableFriends] = useState<FriendListItem[]>([]);
+  const { 
+      currentChatKey, 
+      potentialMembers, 
+      fetchUsersToAdd,  
+      addMembersToGroup 
+  } = useChatStore();
 
-  // 1. Filtrar amigos disponibles
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    if (isOpen) {
-      const memberKeys = new Set(groupMembers.map((m) => m.key));
-      const filtered = friendsList.filter((friend) => !memberKeys.has(friend.key));
-      setAvailableFriends(filtered);
-      setSelectedFriends(new Set());
+    if (isOpen && currentChatKey) {
+      fetchUsersToAdd(currentChatKey);
+      setSelectedUsers(new Set()); 
     }
-  }, [isOpen, friendsList, groupMembers]);
+  }, [isOpen, currentChatKey]);
 
   if (!isOpen) return null;
 
-  const toggleFriendSelection = (key: string) => {
-    setSelectedFriends((prev) => {
+  const toggleSelection = (key: string) => {
+    setSelectedUsers((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
         newSet.delete(key);
@@ -52,100 +41,119 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const keysToAdd = Array.from(selectedFriends);
+    const keysToAdd = Array.from(selectedUsers);
 
-    if (keysToAdd.length === 0) {
-      alert("Selecciona al menos un amigo para añadir.");
-      return;
-    }
+    if (keysToAdd.length === 0 || !currentChatKey) return;
 
-    onAddMembers(keysToAdd, currentGroupKey);
+    setLoading(true);
+    await addMembersToGroup(keysToAdd, currentChatKey);
+    setLoading(false);
+    
+    onClose(); 
   };
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-gray-800 p-6 rounded-lg w-96 relative shadow-2xl"
+        className="bg-gray-800 p-6 rounded-xl w-96 relative shadow-2xl border border-gray-700 animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-xl font-bold mb-4 text-white">Añadir Miembros al Grupo</h2>
+        <h2 className="text-xl font-bold mb-4 text-white">Añadir Miembros</h2>
 
         <form onSubmit={handleSubmit}>
           <p className="text-gray-400 text-sm mb-3">
-            Amigos disponibles para añadir ({availableFriends.length}):
+            Usuarios disponibles ({potentialMembers.length}):
           </p>
 
-          <div className="max-h-60 overflow-y-auto mb-4 border border-gray-700 rounded p-2 bg-gray-700/50">
-            {availableFriends.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">
-                Todos tus amigos están ya en este grupo.
+          <div className="max-h-60 overflow-y-auto mb-4 border border-gray-700 rounded-lg p-2 bg-gray-900/30 custom-scrollbar">
+            {potentialMembers.length === 0 ? (
+              <p className="text-gray-500 text-center py-6 text-sm">
+                No hay más usuarios disponibles.
               </p>
             ) : (
-              availableFriends.map((friend) => (
+              potentialMembers.map((user) => (
                 <div
-                  key={friend.key}
-                  onClick={() => toggleFriendSelection(friend.key)}
-                  className={`flex items-center p-2 rounded cursor-pointer transition ${
-                    selectedFriends.has(friend.key)
-                      ? "bg-purple-600/50"
-                      : "hover:bg-gray-700"
+                  key={user.key}
+                  onClick={() => toggleSelection(user.key)}
+                  className={`flex items-center p-3 rounded-md cursor-pointer transition mb-1 ${
+                    selectedUsers.has(user.key)
+                      ? "bg-purple-600/30 border border-purple-500/50"
+                      : "hover:bg-gray-700/50 border border-transparent"
                   }`}
                 >
-                  <img
-                    src={friend.avatar}
-                    alt={friend.name}
-                    className="w-8 h-8 rounded-full mr-3"
-                  />
-                  <span className="text-white flex-1">{friend.name}</span>
+                  {(() => {
+     
+                      const isImage = user.avatar.startsWith('http') || user.avatar.startsWith('data:');
+                      
+                      return isImage ? (
+                        // CASO 1: Es imagen
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                          className="w-8 h-8 rounded-full mr-3 object-cover bg-gray-600"
+                        />
+                      ) : (
+                        // CASO 2: Es estilo (bg-gray-700)
+                        <div className={`w-8 h-8 rounded-full mr-3 flex-shrink-0 flex items-center justify-center text-white text-xs font-bold ${user.avatar}`}>
+                            {user.name.charAt(0).toUpperCase()}
+                        </div>
+                      );
+                    })()}
+                  <div className="flex-1 min-w-0">
+                     <span className="text-white text-sm font-medium block truncate">{user.name}</span>
+                     {/* Opcional: mostrar email o username pequeño */}
+                  </div>
 
                   <input
                     type="checkbox"
-                    checked={selectedFriends.has(friend.key)}
-                    onChange={() => toggleFriendSelection(friend.key)}
-                    className="form-checkbox text-purple-600 bg-gray-700 border-gray-600 rounded"
+                    readOnly
+                    checked={selectedUsers.has(user.key)}
+                    className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 ml-2"
                   />
                 </div>
               ))
             )}
           </div>
 
-          <div className="flex justify-between items-center text-sm mb-4">
-            <span className="text-gray-300">
-              Seleccionados: {selectedFriends.size}
+          <div className="flex justify-between items-center text-xs mb-6 px-1">
+            <span className="text-gray-400 uppercase tracking-wider font-semibold">
+              {selectedUsers.size} seleccionados
             </span>
-            <button
-              type="button"
-              onClick={() => setSelectedFriends(new Set())}
-              className="text-red-400 hover:text-red-300 transition"
-            >
-              Deseleccionar
-            </button>
+            {selectedUsers.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedUsers(new Set())}
+                className="text-red-400 hover:text-red-300 transition"
+              >
+                Limpiar
+              </button>
+            )}
           </div>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+              className="px-4 py-2 text-sm text-gray-300 hover:text-white transition"
             >
               Cancelar
             </button>
 
             <button
               type="submit"
-              className={`px-4 py-2 text-white rounded transition ${
-                selectedFriends.size === 0
-                  ? "bg-purple-600/50 cursor-not-allowed"
-                  : "bg-purple-600 hover:bg-purple-700"
+              disabled={selectedUsers.size === 0 || loading}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+                selectedUsers.size === 0 || loading
+                  ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                  : "bg-purple-600 text-white hover:bg-purple-500 shadow-lg shadow-purple-900/20"
               }`}
-              disabled={selectedFriends.size === 0}
             >
-              Añadir ({selectedFriends.size})
+              {loading ? 'Añadiendo...' : 'Añadir al grupo'}
             </button>
           </div>
         </form>

@@ -6,3 +6,4 @@ export const PanelPage: React.FC = () => {
   return <PanelApp />;
 };
 
+export default PanelPage;

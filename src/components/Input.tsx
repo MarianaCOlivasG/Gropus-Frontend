@@ -1,17 +1,50 @@
 import React from "react";
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps {
+  type: string;
+  name: string;
+  placeholder: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   label?: string;
+  error?: string; 
 }
 
-const Input: React.FC<InputProps> = ({ label, ...props }) => {
+const Input: React.FC<InputProps> = ({
+  type,
+  name,
+  placeholder,
+  value,
+  onChange,
+  label,
+  error,
+}) => {
   return (
     <div className="flex flex-col gap-1 w-full">
-      {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+      {label && (
+        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">
+          {label}
+        </label>
+      )}
+      
       <input
-        {...props}
-        className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className={`w-full bg-[#202225] text-white p-3 rounded-md outline-none transition-all border-2 
+          ${error 
+            ? "border-red-500 focus:border-red-500" 
+            : "border-transparent focus:border-indigo-500"
+          }`}
       />
+      
+      {error && (
+        <span className="text-red-400 text-xs ml-1 animate-pulse">
+          {error}
+        </span>
+      )}
     </div>
   );
 };

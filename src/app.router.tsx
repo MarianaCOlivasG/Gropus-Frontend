@@ -1,58 +1,78 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, redirect } from "react-router-dom"; 
+import { lazy, Suspense } from "react";
 import { SistemaLayout } from "./sistema/layouts/SistemaLayout";
 import { HomePage } from "./sistema/pages/home/HomePage";
-import LoginPage from "./auth/pages/login/LoginPage";
-//import { RegisterPage } from "./auth/pages/register/RegisterPage";
-import { lazy } from "react";
+import AuthLayout from "./auth/layouts/AuthLayout"; 
+import LoginPage from "./auth/pages/login/LoginPage"; 
 import RegisterPage from "./auth/pages/register/RegisterPage";
-import { PanelPage } from "./sistema/pages/panel/PanelPage";
+ 
+const PanelPage = lazy(() => import("./sistema/pages/panel/PanelPage"));
 
+const publicLoader = async () => {
+  const token = localStorage.getItem('token');
+  if (token) return redirect('/panel');
+  return null;
+};
 
-const AuthLayout = lazy(() => import("./auth/layouts/AuthLayout"))
+const protectedLoader = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) return redirect('/auth/login');
+  return null;
+};
+
+const Load = (Component: React.ComponentType) => (
+  <Suspense fallback={
+    <div className="bg-gray-900 text-gray-100 h-screen flex items-center justify-center">
+        <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+            <p>Cargando...</p>
+        </div>
+    </div>
+  }>
+    <Component />
+  </Suspense>
+);
 
 export const appRouter = createBrowserRouter([
-    //Main Route
     {
         path: '/',
-        element: <SistemaLayout/>,
+        element: <SistemaLayout/>, 
         children: [
-        {
-            index: true,
-            element: <HomePage/>
-        },
-        // {
-        // path: "panel",
-        // element: <PanelPage/>  
-        // }
+            {
+                index: true,
+                element: <HomePage/> 
+            },
         ],
     },
 
-    //Auth Route
     {
         path: '/auth',
-        element: <AuthLayout/>,
+        element: <AuthLayout />, 
         children: [
             {
-                index:true,
-                element: <Navigate to="auth/login"/>
+                index: true,
+                element: <Navigate to="login" replace /> 
             },
             {
                 path: 'login',
-                element: <LoginPage/>
+                loader: publicLoader, 
+                element: <LoginPage />
             },
             {
                 path: 'register',
-                element: <RegisterPage/>
+                loader: publicLoader, 
+                element: <RegisterPage />
             }
         ]
     },
     {
         path: '/panel',
-        element: <PanelPage/>
+        loader: protectedLoader, 
+        element: Load(PanelPage)
     },
+
     {
         path: '*',
-        element: <Navigate to="/" />
-
+        element: <Navigate to="/auth/login" replace />
     },
-])
+]);

@@ -193,3 +193,5 @@ export const friendsList: Friend[] = [
   { key: 'J', name: 'James', avatar: 'https://i.pravatar.cc/40?img=33', status: 'offline', chat: 'James' },
   { key: 'L', name: 'Lucy', avatar: 'https://i.pravatar.cc/40?img=10', status: 'active', chat: 'Lucy' },
 ];
+
+
