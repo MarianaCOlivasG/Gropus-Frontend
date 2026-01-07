@@ -75,7 +75,8 @@ export const createGroupSlice: ChatSliceCreator<any> = (set, get) => ({
             currentChannel: '#general',     
             messages: []
       }));
-      await get().fetchGroups(); 
+      await get().fetchGroups();
+      await get().loadChat(newId);
     } catch (e: any) { console.error(e); Swal.fire('Error', e.message, 'error'); }
   },
 

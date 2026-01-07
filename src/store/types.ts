@@ -18,6 +18,10 @@ export interface Message {
   time: string;
   index?: number;
   role?: string;
+  attachmentUrl?: string | null;
+  attachmentType?: 'image' | 'pdf' | 'file' | null;
+  fileName?: string;
+  created_at: string;
 }
 
 export interface ChannelItem {
@@ -86,15 +90,21 @@ export interface ChatSlice {
   currentChannelObjects: ChannelItem[];
   messages: Message[];
   isLoadingMessages: boolean;
-  pinnedMessage: (Message & { index: number }) | null;
+  pinnedMessages: Record<string, (Message & { index: number }) | null>; 
   mutedChannels: Set<string>;
   socket: any;
+  typingUsers: Record<string, string[]>; 
+
+  previewFile: { url: string; type: 'image' | 'pdf' | string; name: string } | null;
+  openFilePreview: (url: string, type: string, name?: string) => void;
+  closeFilePreview: () => void;
+
   
   loadChat: (chatKey: string) => Promise<void>;
   loadChannel: (channelKey: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   deleteMessage: (index: number, messageId?: string) => Promise<void>;
-  pinMessage: (index: number | null) => void;
+  pinMessage: (index: number | null, channelId: string) => void; 
   toggleMuteChannel: (fullKey: string) => void;
   connectSocket: () => void;   
   disconnectSocket: () => void; 

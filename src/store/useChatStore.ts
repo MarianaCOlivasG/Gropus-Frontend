@@ -27,8 +27,10 @@ export const useChatStore = create<ChatState>()(
         currentUser: state.currentUser,
         currentChannelObjects: state.currentChannelObjects,
         currentChannels: state.currentChannels,
+        pinnedMessages: state.pinnedMessages,
         currentMembers: state.currentMembers,
         tags: state.tags,
+        
       }),
     }
   )

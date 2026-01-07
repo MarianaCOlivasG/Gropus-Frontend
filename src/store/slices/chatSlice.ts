@@ -14,11 +14,13 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
   currentChannelObjects: [],
   messages: [],
   isLoadingMessages: false,
-  pinnedMessage: null,
+  pinnedMessages: {}, 
   mutedChannels: new Set(),
   socket: null, 
 
-  
+  // ESTADO PARA EL VISOR DE ARCHIVOS
+  previewFile: null, // Guardará { url, type, name }
+
   connectSocket: () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -43,7 +45,25 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
       console.error('Socket connection error:', err);
     });
 
-    //LISTENER PARA PERMISOS/TAGS 
+    newSocket.on('user_typing', (data: { channelUid: string, userName: string, isTyping: boolean }) => {
+        set((state) => {
+            const typing = { ...state.typingUsers };
+            const usersInChannel = [...(typing[data.channelUid] || [])];
+            
+            if (data.isTyping) {
+                if (!usersInChannel.includes(data.userName)) {
+                    usersInChannel.push(data.userName);
+                }
+            } else {
+                typing[data.channelUid] = usersInChannel.filter(name => name !== data.userName);
+                return { typingUsers: typing };
+            }
+            
+            typing[data.channelUid] = usersInChannel;
+            return { typingUsers: typing };
+        });
+    });
+
     newSocket.on('member_updated', (data: { userId: string, groupId: string, tags: any[] }) => {
         const { currentMembers, currentChatKey } = get();
         if (currentChatKey === data.groupId) {
@@ -57,7 +77,6 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
         }
     });
 
-    // LISTENER: MENSAJE NUEVO 
     newSocket.on('new_message', (incomingMsg: any) => {
         const { currentChannelObjects, currentChannel } = get();
         const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
@@ -66,6 +85,16 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
         if (activeChannelObj && activeChannelObj.id === msgChannelId) {
             const formattedMsg = formatMessage(incomingMsg); 
             set((state) => ({ messages: [...state.messages, formattedMsg] }));
+        }
+    });
+
+    newSocket.on('message_deleted', (data: { messageId: string, channelUid: string }) => {
+        const { currentChannelObjects, currentChannel } = get();
+        const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+        if (activeChannelObj && activeChannelObj.id === data.channelUid) {
+             set((state) => ({
+                 messages: state.messages.filter(msg => msg.id !== data.messageId)
+             }));
         }
     });
 
@@ -94,10 +123,18 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     }
   },
 
-  loadChat: async (chatKey: string) => {
-    const { allGroups, allFriends } = get();
-    const { socket, currentChatKey } = get();
+  setTypingStatus: (isTyping: boolean) => {
+    const { socket, currentChannelObjects, currentChannel } = get();
+    const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+    if (socket && activeChannelObj) {
+        socket.emit('typing', { channelUid: activeChannelObj.id, isTyping });
+    }
+  },
 
+  loadChat: async (chatKey: string) => {
+    const { allGroups, allFriends, currentChatKey } = get();
+    const { socket } = get();
+    
     if (socket && socket.connected) {
         if (currentChatKey) {
             socket.emit('leave_group', currentChatKey);
@@ -107,10 +144,8 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     
     const group = allGroups.find(g => g.key === chatKey);
     const friend = allFriends.find(f => f.chat === chatKey);
-    
     const isGroupChat = !!group;
     const displayName = group?.display || friend?.name || "Chat";
-
     let channelObjs: ChannelItem[] = group?.channels || [];
     
     const savedChannel = get().currentChannel || '#general';
@@ -123,7 +158,6 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
       isGroup: isGroupChat,
       chatDisplayName: displayName,
       currentChannel: initialChannel,
-      pinnedMessage: null,
       messages: [], 
       currentChannelObjects: channelObjs,
       currentChannels: channelObjs.map(c => c.key),
@@ -178,7 +212,6 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
 
   loadChannel: async (channelKey: string) => {
     const { socket, currentChannelObjects } = get();
-    
     const previousKey = get().currentChannel;
     const prevChannelObj = currentChannelObjects.find(c => c.key === previousKey);
     
@@ -197,9 +230,7 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
 
   sendMessage: async (text: string) => {
     const { currentChatKey, currentChannel, currentChannelObjects, currentUser, socket } = get();
-    
     if (!currentChatKey || !text.trim() || !currentUser) return;
-    
     const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
     if (!channelObj) return;
 
@@ -213,28 +244,60 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     }
   },
 
-  deleteMessage: async (index: number, messageId: string) => {
-    const { messages } = get();
-    const newMessages = messages.filter((_, idx) => idx !== index);
-    set({ messages: newMessages });
+  sendFileMessage: async (file: File) => {
+    const { currentChannelObjects, currentChannel } = get();
+    const token = localStorage.getItem('token');
+    
+    const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
+    if (!channelObj) return Swal.fire('Error', 'Canal no encontrado', 'error');
 
-    if (messageId) {
-        try {
-            const token = localStorage.getItem('token');
-            await fetch(`${API_URL}/messages/${messageId}`, {
-                  method: 'DELETE',
-                  headers: { Authorization: `Bearer ${token}` }
-            });
-        } catch (error) {
-            console.error("Error deleting message", error);
-        }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('channelUid', channelObj.id); 
+
+    try {
+        const res = await fetch(`${API_URL}/messages/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!res.ok) throw new Error('Error al subir archivo');
+
+    } catch (error) {
+        console.error("Error subiendo archivo:", error);
+        Swal.fire('Error', 'No se pudo enviar el archivo', 'error');
     }
   },
 
-  pinMessage: (index: number) => {
-    if (index === null) return set({ pinnedMessage: null });
-    const msg = get().messages[index];
-    if (msg) set({ pinnedMessage: { ...msg, index } });
+  deleteMessage: async (index: number, messageId: string) => {
+    const { messages, socket } = get();
+    const newMessages = messages.filter((_, idx) => idx !== index);
+    set({ messages: newMessages });
+
+    if (messageId && socket && socket.connected) {
+        socket.emit('delete_message', { messageId }); 
+    } else {
+        console.error("No hay conexión socket para borrar el mensaje");
+    }
+  },
+
+  pinMessage: (index: number | null, channelId: string) => {
+    if (!channelId) return;
+    const { messages, pinnedMessages } = get();
+    const newPinnedRecord = { ...pinnedMessages };
+
+    if (index === null) {
+      delete newPinnedRecord[channelId];
+    } else {
+      const msg = messages[index];
+      if (msg) {
+        newPinnedRecord[channelId] = { ...msg, index };
+      }
+    }
+    set({ pinnedMessages: newPinnedRecord });
   },
 
   toggleMuteChannel: (fullKey: string) => {
@@ -258,18 +321,59 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
       showConfirmButton: false,
       timer: 1500,
     });
+  },
+
+  //FUNCIONES PARA EL VISOR DE ARCHIVOS
+  openFilePreview: (url: string, type: string, name: string = "Archivo") => {
+    // Si la URL es de imagen interna backend pegamos el API_URL
+    const fullUrl = (type === 'image' && !url.startsWith('http')) 
+      ? `${API_URL}/images/${url.replace(/^\//, '')}` 
+      : url;
+    
+    set({ previewFile: { url: fullUrl, type, name } });
+  },
+
+  closeFilePreview: () => {
+    set({ previewFile: null });
   }
 });
 
-//Formateo de Mensajes
 const formatMessage = (msg: any): Message => {
+    const content = msg.content || msg.message || "";
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(content);
+    const isPdf = /\.pdf$/i.test(content);
+    const isUrl = content.startsWith('http://') || content.startsWith('https://');
+    const isOtherFile = !isImage && !isPdf && !isUrl && (content.includes('/') || content.includes('\\'));
+
+    let type: 'image' | 'pdf' | 'file' | null = null;
+    if (isImage) type = 'image';
+    else if (isPdf) type = 'pdf';
+    else if (isOtherFile) type = 'file';
+
+    let finalUrl = null;
+    let fileName = content.split(/[/\\]/).pop();
+    try { if (fileName) fileName = decodeURIComponent(fileName); } catch {}
+
+    if (type) {
+        if (content.startsWith('http')) {
+            finalUrl = content;
+        } else {
+            const cleanPath = content.startsWith('/') ? content.slice(1) : content;
+            finalUrl = `${API_URL}/images/${cleanPath}`;
+        }
+    }
+
     return {
         id: msg.uid || msg.id,
         sender: msg.sender?.uid || msg.sender || msg.id_user, 
-        name: msg.sender?.name || msg.sender?.username || "Usuario",
-        avatar: msg.sender?.picture || msg.sender?.avatar || "",
-        text: msg.content || msg.message, 
+        name: msg.sender?.name || "Usuario",
+        avatar: msg.sender?.picture || "",
+        text: type ? "" : content, 
         time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        role: msg.sender?.role || 'user'
+        role: msg.sender?.role || 'user',
+        attachmentUrl: finalUrl,
+        attachmentType: type,
+        fileName: fileName || "Archivo",
+        created_at: msg.created_at
     };
 };

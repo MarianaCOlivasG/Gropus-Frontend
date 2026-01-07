@@ -19,7 +19,7 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
 
     set({ isCheckingAuth: true });
     try {
-        const res = await fetch(`${API_URL}/auth/renew/customer`, {
+        const res = await fetch(`${API_URL}/auth/renew/user`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
                 'Cache-Control': 'no-cache' 

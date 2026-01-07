@@ -4,29 +4,79 @@ interface ChatHeaderProps {
   title: string;
   description: string | null;
   subtitle?: string;
-  pinnedMessage: { text: string } | null;
+  pinnedMessage: { text: string; index: number } | null;
   onUnpin: () => void;
+  onJump: () => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 }
 
-const ChatHeader: React.FC<ChatHeaderProps> = ({ title, description, subtitle, pinnedMessage, onUnpin }) => {
+const ChatHeader: React.FC<ChatHeaderProps> = ({ 
+  title, description: _description, subtitle, pinnedMessage, onUnpin, onJump, 
+  isMuted, onToggleMute 
+}) => {
   return (
-    <div className="bg-gray-900/50 p-4 border-b border-gray-700 backdrop-blur-sm z-10 shadow-sm flex flex-col">
-      <div className="flex items-baseline space-x-2">
-        <h2 className="text-lg font-bold text-white">{title}</h2>
-        {subtitle && <span className="text-xs text-gray-500 font-normal">{subtitle}</span>}
-      </div>
-      {description && <p className="text-gray-400 text-xs mt-0.5 truncate">{description}</p>}
+    <header className="flex flex-col w-full z-20 shadow-sm">
+      <div className="bg-[#1e1f22]/50 backdrop-blur-md h-12 px-4 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className="text-white text-lg font-bold">#</span>
+          <h2 className="text-white text-lg font-bold truncate">
+            {title.startsWith('#') ? title.substring(1) : title}
+          </h2>
+          {subtitle && (
+            <span className="text-gray-400 text-sm font-medium ml-1">
+              en {subtitle}
+            </span>
+          )}
+        </div>
 
+        {/* BOTÓN DE SILENCIAR */}
+        <button 
+          onClick={onToggleMute}
+          className={`p-2 rounded-lg transition-all ${isMuted ? 'text-red-400 bg-red-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+          title={isMuted ? "Quitar silencio" : "Silenciar canal"}
+        >
+          {isMuted ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
+          )}
+        </button>
+      </div>
+
+      {/* Mensaje fijado */}
       {pinnedMessage && (
-        <div className="bg-gray-700/30 border-l-4 border-yellow-500 p-2 mt-2 flex justify-between items-center rounded-r text-sm">
-          <div className="flex items-center space-x-2 overflow-hidden text-gray-300">
-            <span>📌</span>
-            <span className="truncate">{pinnedMessage.text}</span>
+        <div className="px-4 py-2 bg-[#1e1f22]/30">
+          <div className="bg-gradient-to-r from-purple-600/20 via-[#2b2d31]/80 to-transparent backdrop-blur-lg border border-white/10 p-2 rounded-xl flex items-center justify-between shadow-2xl ring-1 ring-purple-500/20 animate-in fade-in zoom-in duration-500">
+            <div className="flex items-center gap-3 min-w-0 ml-2">
+              <div className="relative flex-shrink-0">
+                <span className="text-xl">📌</span>
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full animate-ping" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] text-purple-400 font-black uppercase tracking-widest leading-none mb-1">
+                  Fijado
+                </span>
+                <p className="text-xs text-white font-medium truncate">
+                  {pinnedMessage.text}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pr-2">
+              <button 
+                onClick={onJump}
+                className="bg-[#9146ff] hover:bg-[#772ce8] text-white text-[10px] px-4 py-1.5 rounded-lg font-black transition-all active:scale-95 uppercase"
+              >
+                VER
+              </button>
+              <button onClick={onUnpin} className="text-gray-400 hover:text-white w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">
+                <span className="text-lg">×</span>
+              </button>
+            </div>
           </div>
-          <button onClick={onUnpin} className="text-gray-500 hover:text-white px-2">✕</button>
         </div>
       )}
-    </div>
+    </header>
   );
 };
 

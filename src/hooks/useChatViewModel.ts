@@ -9,7 +9,7 @@ export const useChatViewModel = () => {
       currentChannel: state.currentChannel,
       isGroup: state.isGroup,
       messages: state.messages,
-      pinnedMessage: state.pinnedMessage,
+      pinnedMessages: state.pinnedMessages,
       mutedChannels: state.mutedChannels,
       currentChannels: state.currentChannels,
       currentChannelObjects: state.currentChannelObjects,
