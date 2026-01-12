@@ -30,6 +30,7 @@ export const useChatStore = create<ChatState>()(
         pinnedMessages: state.pinnedMessages,
         currentMembers: state.currentMembers,
         tags: state.tags,
+        allFriends: state.allFriends,
         
       }),
     }

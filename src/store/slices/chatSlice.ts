@@ -1,6 +1,6 @@
 import Swal from 'sweetalert2';
 import { io } from 'socket.io-client';
-import type { ChatSliceCreator, ChannelItem, Message } from '../types';
+import type { ChatSliceCreator, Message } from '../types';
 
 const API_URL = import.meta.env?.VITE_API_URL;
 const SOCKET_URL = import.meta.env?.VITE_SOCKET_URL;
@@ -17,8 +17,9 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
   pinnedMessages: {}, 
   mutedChannels: new Set(),
   socket: null, 
+  isLoadingMore: false,
 
-  // ESTADO PARA EL VISOR DE ARCHIVOS
+  // VISOR DE ARCHIVOS
   previewFile: null, // Guardará { url, type, name }
 
   connectSocket: () => {
@@ -78,37 +79,77 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     });
 
     newSocket.on('new_message', (incomingMsg: any) => {
-        const { currentChannelObjects, currentChannel } = get();
-        const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
-        const msgChannelId = incomingMsg.channel || incomingMsg.id_chat;
+        const { currentChannelObjects, currentChannel, currentChatKey, isGroup } = get();
+        
+        let activeTargetId = "";
+        
+        if (isGroup) {
+             const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+             activeTargetId = activeChannelObj?.id || "";
+        } else {
+             activeTargetId = currentChatKey || "";
+        }
 
-        if (activeChannelObj && activeChannelObj.id === msgChannelId) {
+        const msgTargetId = incomingMsg.channel || incomingMsg.id_chat || incomingMsg.privateChat;
+
+        if (activeTargetId && activeTargetId === msgTargetId) {
             const formattedMsg = formatMessage(incomingMsg); 
             set((state) => ({ messages: [...state.messages, formattedMsg] }));
         }
     });
 
     newSocket.on('message_deleted', (data: { messageId: string, channelUid: string }) => {
-        const { currentChannelObjects, currentChannel } = get();
-        const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
-        if (activeChannelObj && activeChannelObj.id === data.channelUid) {
+        const { currentChannelObjects, currentChannel, currentChatKey, isGroup } = get();
+        
+        let activeTargetId = "";
+        if (isGroup) {
+             const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+             activeTargetId = activeChannelObj?.id || "";
+        } else {
+             activeTargetId = currentChatKey || "";
+        }
+
+        if (activeTargetId && activeTargetId === data.channelUid) {
              set((state) => ({
                  messages: state.messages.filter(msg => msg.id !== data.messageId)
              }));
         }
     });
 
-    newSocket.on('history_messages', (data: { channelUid: string, messages: any[] }) => {
-        const { currentChannelObjects, currentChannel } = get();
-        const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+    newSocket.on('history_messages', (data: { channelUid: string, messages: any[], isPagination?: boolean }) => {
+        const { currentChannelObjects, currentChannel, currentChatKey, isGroup } = get();
+        let activeTargetId = "";
+        if (isGroup) {
+             const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+             activeTargetId = activeChannelObj?.id || "";
+        } else {
+             activeTargetId = currentChatKey || "";
+        }
 
-        if (activeChannelObj && activeChannelObj.id === data.channelUid) {
+        if (activeTargetId && activeTargetId === data.channelUid) {
             const formattedHistory = data.messages.map(msg => formatMessage(msg));
             
-            set({ 
-                messages: formattedHistory,
-                isLoadingMessages: false 
+            set((state) => {
+                if (data.isPagination) {
+                  if (formattedHistory.length === 0) {
+                    return { isLoadingMore: false }; 
+                  }
+                  return {
+                    messages: [...formattedHistory, ...state.messages],
+                    isLoadingMore: false 
+                  };
+                } else {
+                  return {
+                    messages: formattedHistory,
+                    isLoadingMessages: false 
+                  };
+                }
             });
+            
+            // set({ 
+            //     messages: formattedHistory,
+            //     isLoadingMessages: false 
+            // });
         }
     });
 
@@ -123,6 +164,28 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     }
   },
 
+  loadMoreMessages: () => {
+    const { currentChannel, messages, socket, currentChannelObjects, isGroup, currentChatKey } = get();
+    
+    let targetUid = "";
+    if (isGroup) {
+        const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
+        if (!activeChannelObj) return;
+        targetUid = activeChannelObj.id;
+    } else {
+        targetUid = currentChatKey || "";
+    }
+    const oldestMessage = messages[0];
+
+    console.log("Cargando mensajes anteriores a:", oldestMessage.created_at);
+    set({ isLoadingMore: true });
+
+    socket.emit('request_more_history', {
+        channelUid: targetUid,
+        beforeDate: oldestMessage.created_at 
+    });
+  },
+
   setTypingStatus: (isTyping: boolean) => {
     const { socket, currentChannelObjects, currentChannel } = get();
     const activeChannelObj = currentChannelObjects.find(c => c.key === currentChannel);
@@ -132,41 +195,39 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
   },
 
   loadChat: async (chatKey: string) => {
-    const { allGroups, allFriends, currentChatKey } = get();
-    const { socket } = get();
+    const { allGroups, allFriends, currentChatKey, socket, currentUser } = get(); 
     
     if (socket && socket.connected) {
         if (currentChatKey) {
-            socket.emit('leave_group', currentChatKey);
+            socket.emit('leave_group', currentChatKey); 
         }
-        socket.emit('join_group', chatKey);
+        socket.emit('join_group', chatKey); 
     }
     
     const group = allGroups.find(g => g.key === chatKey);
     const friend = allFriends.find(f => f.chat === chatKey);
+    
     const isGroupChat = !!group;
     const displayName = group?.display || friend?.name || "Chat";
-    let channelObjs: ChannelItem[] = group?.channels || [];
-    
-    const savedChannel = get().currentChannel || '#general';
-    const initialChannel = channelObjs.length > 0 
-    ? (channelObjs.some(c => c.key === savedChannel) ? savedChannel : '#general')
-    : '#general';
 
     set({ 
       currentChatKey: chatKey,
       isGroup: isGroupChat,
       chatDisplayName: displayName,
-      currentChannel: initialChannel,
       messages: [], 
-      currentChannelObjects: channelObjs,
-      currentChannels: channelObjs.map(c => c.key),
       currentMembers: [], 
       tags: []
     });
-
-    if (isGroupChat && group) {
+    
+    if (isGroupChat) {
         set(state => ({ loadingGroupChannels: { ...state.loadingGroupChannels, [chatKey]: true } }));
+        
+        const channelObjs = group?.channels || [];
+        const savedChannel = get().currentChannel || '#general';
+        const initialChannel = channelObjs.length > 0 
+           ? (channelObjs.some(c => c.key === savedChannel) ? savedChannel : '#general')
+           : '#general';
+
         try {
           const token = localStorage.getItem('token');
           const res = await fetch(`${API_URL}/channels/group/${chatKey}`, {
@@ -176,7 +237,6 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
           if(res.ok) {
               const result = await res.json();
               const channelsData = Array.isArray(result) ? result : Object.values(result);
-              
               const finalChannels = channelsData.map((ch: any) => ({
                 id: ch.uid || ch.id,
                 name: ch.name,
@@ -186,28 +246,68 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
               }));
               
               const updatedGroups = get().allGroups.map(g => g.key === chatKey ? { ...g, channels: finalChannels } : g);
-              const validSavedChannel = finalChannels.some(c => c.key === initialChannel) ? initialChannel : '#general';
-
+              
               set({
                 allGroups: updatedGroups,
                 currentChannelObjects: finalChannels,
                 currentChannels: finalChannels.map(c => c.key),
-                currentChannel: validSavedChannel 
+                currentChannel: initialChannel 
               });
           }
         } catch(e) {
-            console.error("Error loading channels", e);
+            console.error(e);
         } finally {
           set(state => ({ loadingGroupChannels: { ...state.loadingGroupChannels, [chatKey]: false } }));
         }
-    }
 
-    if (isGroupChat) {
         await get().fetchGroupMembers(chatKey);
         await get().fetchTags();
-    }
+        await get().loadChannel(get().currentChannel);
 
-    await get().loadChannel(get().currentChannel);
+    } else {
+    
+        const dmChannelObj = {
+            id: chatKey,        
+            key: chatKey,       
+            name: displayName,
+            description: 'Mensaje Directo',
+            tags: []
+        };
+
+        const friendData = allFriends.find(f => f.chat === chatKey);
+        const privateMembers = [];
+        
+        if (currentUser) {
+             privateMembers.push({
+                key: currentUser.uid,
+                name: currentUser.name,
+                avatar: currentUser.avatar,
+                role: 'owner' 
+             });
+        }
+        if (friendData) {
+            privateMembers.push({
+                key: friendData.key, 
+                name: friendData.name,
+                avatar: friendData.avatar,
+                role: 'member'
+            });
+        }
+
+        set({
+            currentChannelObjects: [dmChannelObj],
+            currentChannels: [chatKey],
+            currentChannel: chatKey, 
+            loadingGroupChannels: { ...get().loadingGroupChannels, [chatKey]: false },
+            currentMembers: privateMembers 
+        });
+
+        if (socket) {
+            socket.emit('join_channel', { channelUid: chatKey });
+        }
+        
+        set({ isLoadingMessages: true });
+    }
   },
 
   loadChannel: async (channelKey: string) => {
@@ -229,14 +329,22 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
   },
 
   sendMessage: async (text: string) => {
-    const { currentChatKey, currentChannel, currentChannelObjects, currentUser, socket } = get();
+    const { currentChatKey, currentChannel, currentChannelObjects, currentUser, isGroup, socket } = get();
     if (!currentChatKey || !text.trim() || !currentUser) return;
-    const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
-    if (!channelObj) return;
+
+    let targetUid = "";
+
+    if (isGroup) {
+        const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
+        if (!channelObj) return;
+        targetUid = channelObj.id;
+    } else {
+        targetUid = currentChatKey || "";
+    }
 
     if (socket && socket.connected) {
         socket.emit('send_message', {
-            channelUid: channelObj.id,
+            channelUid: targetUid,
             content: text
         });
     } else {
@@ -245,15 +353,25 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
   },
 
   sendFileMessage: async (file: File) => {
-    const { currentChannelObjects, currentChannel } = get();
+    const { currentChannelObjects, currentChannel, currentChatKey, isGroup } = get();
     const token = localStorage.getItem('token');
     
-    const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
-    if (!channelObj) return Swal.fire('Error', 'Canal no encontrado', 'error');
+    let targetUid = "";
+    if (isGroup) {
+        const channelObj = currentChannelObjects.find(c => c.key === currentChannel);
+        if (!channelObj) return Swal.fire('Error', 'Canal no encontrado', 'error');
+        targetUid = channelObj.id;
+    } else {
+        targetUid = currentChatKey || "";
+    }
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('channelUid', channelObj.id); 
+    if (isGroup) {
+        formData.append('channelUid', targetUid); 
+    } else {
+        formData.append('privateChatUid', targetUid); 
+    }
 
     try {
         const res = await fetch(`${API_URL}/messages/upload`, {
@@ -323,9 +441,76 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
     });
   },
 
-  //FUNCIONES PARA EL VISOR DE ARCHIVOS
+  fetchFriends: async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_URL}/chats/private/mine`, { 
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (res.ok) {
+            const friendsList = await res.json();
+            set({ allFriends: friendsList });
+        } else {
+            console.error("Error al obtener chats privados:", res.statusText);
+        }
+    } catch (error) {
+        console.error("Error en fetchFriends:", error);
+    }
+  },
+
+  getOrCreatePrivateChat: async (targetUser: any) => {
+    const { allFriends, loadChat } = get(); 
+
+    const existingFriend = allFriends.find((f: any) => f.key === targetUser.key);
+    if (existingFriend && existingFriend.chat) {
+      loadChat(existingFriend.chat);
+      return;
+    }
+
+    try {
+        const token = localStorage.getItem('token');
+        const API_URL = import.meta.env.VITE_API_URL;
+
+        const res = await fetch(`${API_URL}/chats/private`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ partnerId: targetUser.key })
+        });
+
+        if (!res.ok) throw new Error("Error creando chat");
+        const data = await res.json(); 
+
+        const newDMChat = {
+            key: targetUser.key,
+            chat: data.chatId, 
+            name: targetUser.name,
+            avatar: targetUser.avatar || 'bg-gray-700',
+            status: targetUser.status || 'offline'
+        };
+
+        set((state: any) => ({
+            allFriends: [newDMChat, ...state.allFriends] 
+        }));
+
+        loadChat(data.chatId);
+
+    } catch (error) {
+        console.error("Error getOrCreatePrivateChat:", error);
+    }
+  },
+
+  
   openFilePreview: (url: string, type: string, name: string = "Archivo") => {
-    // Si la URL es de imagen interna backend pegamos el API_URL
     const fullUrl = (type === 'image' && !url.startsWith('http')) 
       ? `${API_URL}/images/${url.replace(/^\//, '')}` 
       : url;
@@ -339,26 +524,17 @@ export const createChatSlice: ChatSliceCreator<any> = (set, get) => ({
 });
 
 const formatMessage = (msg: any): Message => {
+    const typeFromDB = msg.type || 'text'; 
+    const isAttachment = typeFromDB === 'image' || typeFromDB === 'document';
     const content = msg.content || msg.message || "";
-    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(content);
-    const isPdf = /\.pdf$/i.test(content);
-    const isUrl = content.startsWith('http://') || content.startsWith('https://');
-    const isOtherFile = !isImage && !isPdf && !isUrl && (content.includes('/') || content.includes('\\'));
-
-    let type: 'image' | 'pdf' | 'file' | null = null;
-    if (isImage) type = 'image';
-    else if (isPdf) type = 'pdf';
-    else if (isOtherFile) type = 'file';
 
     let finalUrl = null;
-    let fileName = content.split(/[/\\]/).pop();
-    try { if (fileName) fileName = decodeURIComponent(fileName); } catch {}
-
-    if (type) {
+    
+    if (isAttachment) {
         if (content.startsWith('http')) {
             finalUrl = content;
         } else {
-            const cleanPath = content.startsWith('/') ? content.slice(1) : content;
+            const cleanPath = content.replace(/^\/+/, '');
             finalUrl = `${API_URL}/images/${cleanPath}`;
         }
     }
@@ -368,12 +544,16 @@ const formatMessage = (msg: any): Message => {
         sender: msg.sender?.uid || msg.sender || msg.id_user, 
         name: msg.sender?.name || "Usuario",
         avatar: msg.sender?.picture || "",
-        text: type ? "" : content, 
+        text: !isAttachment ? content : "",
+        attachmentType: isAttachment ? typeFromDB : undefined, 
+        attachmentUrl: finalUrl,
+        mimeType: msg.mime_type,   
+        fileName: msg.file_name || "Archivo",
+        fileSize: msg.file_size,   
+        imageWidth: msg.img_width || null,
+        imageHeight: msg.img_height || null,
         time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         role: msg.sender?.role || 'user',
-        attachmentUrl: finalUrl,
-        attachmentType: type,
-        fileName: fileName || "Archivo",
         created_at: msg.created_at
     };
 };

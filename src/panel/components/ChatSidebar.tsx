@@ -33,6 +33,13 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const { currentUser, currentMembers} = useChatStore();
   const { handleCreate, handleDelete } = useChannelActions(createNewChannel, updateChannel, deleteChannel);
   const [channelToEdit, setChannelToEdit] = useState<ChannelItem | null>(null);
+  
+  const canCreate = usePermission('create_channel');
+  const canEdit = usePermission('edit_channel');
+  const canDelete = usePermission('delete_channel');
+  const canDeleteGroup = usePermission('delete_server');
+
+  if (!isGroup) return null; 
 
   const onTrashClick = async () => {
     const result = await fireStyledAlert({
@@ -47,16 +54,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
   };
 
-  if (!isGroup) return null; 
-
   const formatChannelName = (name: string) => (name.startsWith("#") ? name : `#${name}`);
   const getFullChannelObj = (key: string) => currentChannelObjects.find((ch) => ch.key === key);
   
-  const canCreate = usePermission('create_channel');
-  const canEdit = usePermission('edit_channel');
-  const canDelete = usePermission('delete_channel');
-  const canDeleteGroup = usePermission('delete_server');
-
   const myMemberProfile = currentMembers.find(m => m.key === currentUser?.uid);
   const myRole = myMemberProfile?.role;
   const myTags = myMemberProfile?.tags || [];
@@ -101,7 +101,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           const isActive = currentChannel === c;
           const isPrivate = channelObj?.tags && channelObj.tags.length > 0;
           return (
-            <div key={c} className={`group flex justify-between items-center px-2 py-1.5 rounded-md mx-1 cursor-pointer transition-all duration-200 select-none ${isActive ? 'bg-gray-800 text-purple-400' : 'text-gray-400 hover:bg-gray-800/50 hover:text-purple-400'}`} onClick={() => loadChannel(c)}>
+            <div key={c} className={`group flex justify-between items-center px-2 py-1.5 rounded-md mx-1 cursor-pointer transition-all duration-200 select-none ${isActive ? 'bg-gray-800 text-purple-400' : 'text-gray-400 hover:bg-gray-800/50 hover:text-purple-400'}`} onClick={() => { if (currentChannel !== c) { loadChannel(c); }}}>
               <div className="flex items-center flex-1 min-w-0 overflow-hidden">
                 <span className={`text-lg mr-1 font-light opacity-50 flex items-center justify-center w-5 ${isActive ? 'text-purple-400' : 'text-gray-500'}`}>
                     {isPrivate ? (

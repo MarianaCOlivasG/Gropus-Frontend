@@ -64,7 +64,7 @@ const PanelApp: React.FC = () => {
     setIsCreateGroupModalOpen(true);
   };
 
-  // Función para abrir modo EDITAR (Llamada desde la tuerca en ChatArea -> ChatSidebar)
+  // Función para abrir modo EDITAR 
   const handleOpenEdit = () => {
     const group = allGroups.find(g => g.key === currentChatKey);
     if (group) {
@@ -74,7 +74,7 @@ const PanelApp: React.FC = () => {
     }
   };
 
-  // Función unificada que decide si crear o actualizar en el servidor
+  // Función unificada que decide si crear o actualizar en elservidor 
   const handleSaveGroup = async (data: any) => {
     try {
       if (modalMode === 'create') {

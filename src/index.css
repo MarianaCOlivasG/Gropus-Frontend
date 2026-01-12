@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
-/* ------------------------- */
+
 body {
-  background-color: #202225; /* Fondo general oscuro */
-  color: white; /* Texto base blanco */
+  background-color: #202225; 
+  color: white; 
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
 }
-/* ------------------------ */
+
 
 /* 1. Ancho */
 ::-webkit-scrollbar {

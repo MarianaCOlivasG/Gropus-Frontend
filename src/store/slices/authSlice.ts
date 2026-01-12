@@ -46,6 +46,7 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
         
         await get().fetchGroups(newToken);
         await get().fetchTags();
+        await get().fetchFriends();
 
     } catch (error) {
         console.error("Error de sesión:", error);
@@ -57,28 +58,31 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
 
   updateUserProfile: async (data: { name: string; bio?: string; imageFile?: File | null }) => {
     const token = localStorage.getItem('token');
-    
-    const { currentUser,  } = get(); 
-    //currentMembers, allFriends
+    const { currentUser } = get(); 
     
     if (!token || !currentUser) return; 
 
     try {
-        let newName = currentUser.name;
+        let newName = data.name; 
         let newAvatar = currentUser.avatar;
-        // let newBio = (currentUser as any).bio; 
+    
+        const bodyData = {
+            name: data.name,       
+            description: data.bio  
+        };
 
-        if (data.name !== currentUser.name) {
-             const res = await fetch(`${API_URL}/users/${currentUser.uid}`, { 
-                method: 'PUT', 
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ name: data.name, bio: data.bio })
-             });
-             if(!res.ok) throw new Error("Error actualizando perfil");
-             newName = data.name;
+        const res = await fetch(`${API_URL}/users/${currentUser.uid}`, { 
+            method: 'PUT', 
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(bodyData)
+        });
+
+        if(!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.message || "Error actualizando perfil");
         }
 
         if (data.imageFile) {
@@ -93,12 +97,13 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
 
             if(!resImg.ok) throw new Error("Error subiendo imagen");
             const resultImg = await resImg.json();
-            newAvatar = resultImg.data?.image || resultImg.data?.picture || resultImg.data?.url;
+            newAvatar = resultImg.data?.picture || resultImg.data?.image || resultImg.data?.url;
         }
 
         const updatedUserObj = {
             ...currentUser,
-            name: newName,
+            name: newName,  
+            bio: data.bio,
             avatar: newAvatar
         };
 
@@ -111,7 +116,6 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
                 ? { ...member, name: newName, avatar: newAvatar } 
                 : member
             ),
-
             allFriends: state.allFriends.map(friend => 
                 friend.key === uid 
                 ? { ...friend, name: newName, avatar: newAvatar } 
@@ -124,7 +128,6 @@ export const createAuthSlice: ChatSliceCreator<any> = (set, get) => ({
         throw error;
     }
   },
-
   logout: () => {
     localStorage.clear(); 
     window.location.reload();

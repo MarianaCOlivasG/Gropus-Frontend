@@ -23,12 +23,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   openUserProfile,
   deleteMessage,
   pinMessage,
+  //onImageLoad,
 }) => {
   
   const store = useChatStore() as any;
   const { currentUser, currentMembers, openFilePreview } = store;
   const isCurrentUser = currentUser?.uid === msg.sender;
-  
   
   const memberProfile = currentMembers.find((m: any) => m.key === msg.sender);
   const displayRole = memberProfile?.role || msg.role;
@@ -68,55 +68,108 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderContent = () => {
     // IMÁGENES
     if (msg.attachmentType === "image" && msg.attachmentUrl) {
+      const hasDimensions = msg.imageWidth && msg.imageHeight;
+      const aspectRatio = hasDimensions 
+        ? `${msg.imageWidth} / ${msg.imageHeight}` 
+        : 'auto';
+
       return (
         <div className="mt-1">
-          <img
-            src={msg.attachmentUrl || ""}
-            alt="Imagen adjunta"
-            className="rounded-lg max-w-full md:max-w-[250px] max-h-[300px] object-cover border border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => openFilePreview(msg.attachmentUrl || "", "image", msg.fileName)}
-          />
+          <div 
+            style={{
+                width: '100%',
+                maxWidth: '300px', 
+                aspectRatio: aspectRatio,
+                display: 'flex', 
+                backgroundColor: 'rgba(31, 41, 55, 0.5)', 
+                borderRadius: '0.5rem',
+                overflow: 'hidden'
+            }}
+          >
+            <img
+              src={msg.attachmentUrl}
+              alt="Imagen adjunta"
+              className="cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => openFilePreview(msg.attachmentUrl!, "image", msg.fileName)}
+              style={{
+                  width: '100%',
+                  height: '100%', 
+                  objectFit: 'cover',
+                  display: 'block' 
+              }}
+              // Opcional: Un pequeño hack para forzar scroll si la imagen tarda y no tenía dimensiones
+              // onLoad={() => {
+              //     // Solo si quieres ser paranoico con el scroll
+              //     const element = document.getElementById(`msg-${index}`);
+              //     if(element) element.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+              // }}
+              
+            />
+          </div>
         </div>
       );
     }
 
-    // PDF
-    if (msg.attachmentType === "pdf" && msg.attachmentUrl) {
+    // DOCUMENTOS
+    if (msg.attachmentType === "document" && msg.attachmentUrl) {
+      const mime = msg.mimeType || "";
+      const isPdf = mime.includes('pdf');
+      const isWord = mime.includes('word') || mime.includes('document') || mime.includes('msword');
+      const isExcel = mime.includes('sheet') || mime.includes('excel');
+      
+      let iconSvg = <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>;
+      
+      let iconColorClass = "bg-blue-500/20 text-blue-400"; 
+
+      if (isPdf) {
+        iconColorClass = "bg-red-500/20 text-red-400";
+        iconSvg = <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>;
+      } else if (isWord) {
+        iconColorClass = "bg-blue-600/20 text-blue-500";
+      } else if (isExcel) {
+        iconColorClass = "bg-green-500/20 text-green-400";
+      }
+      
       return (
         <div className="flex items-center gap-3 bg-black/20 p-2 rounded-lg border border-white/10 min-w-[200px] max-w-full">
-          <div className="bg-red-500/20 p-2 rounded text-red-400 flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
+          {/* Caja del Icono */}
+          <div className={`${iconColorClass} p-2 rounded flex-shrink-0`}>
+            {iconSvg}
           </div>
+          
+          {/* Información del Archivo */}
           <div className="flex flex-col text-left overflow-hidden">
-            <span className="text-xs text-gray-300 font-semibold truncate" title={msg.fileName}>{msg.fileName || "Documento PDF"}</span>
-            <button 
-              onClick={() => openFilePreview(msg.attachmentUrl || "", "pdf", msg.fileName)}
-              className="text-[10px] text-blue-400 hover:underline truncate text-left"
-            >
-              Ver documento
-            </button>
+            <span className="text-xs text-gray-300 font-semibold truncate max-w-[150px]" title={msg.fileName}>
+                {msg.fileName || "Documento"}
+            </span>
+            
+            <div className="flex items-center gap-2 mt-0.5">
+                {/* Tamaño del archivo si existe */}
+                {msg.fileSize && (
+                    <span className="text-[9px] text-gray-400 font-mono uppercase">{msg.fileSize}</span>
+                )}
+                
+                {/* Botón de acción */}
+                <button 
+                  onClick={() => {
+                      if (isPdf) {
+                          openFilePreview(msg.attachmentUrl!, "pdf", msg.fileName);
+                      } else {
+                          window.open(msg.attachmentUrl!, '_blank');
+                      }
+                  }}
+                  className="text-[10px] text-blue-400 hover:underline truncate text-left"
+                >
+                  {isPdf ? "Ver PDF" : "Descargar"}
+                </button>
+            </div>
           </div>
         </div>
       );
-    }
-
-    // OTROS ARCHIVOS
-    if (msg.attachmentType === "file" && msg.attachmentUrl) {
-        return (
-          <div className="flex items-center gap-3 bg-black/20 p-2 rounded-lg border border-white/10 min-w-[200px] max-w-full">
-            <div className="bg-blue-500/20 p-2 rounded text-blue-400 flex-shrink-0">
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-            </div>
-            <div className="flex flex-col text-left overflow-hidden">
-              <span className="text-xs text-gray-300 font-semibold truncate" title={msg.fileName}>{msg.fileName || "Archivo Adjunto"}</span>
-              <a href={msg.attachmentUrl || ""} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 hover:underline">Descargar</a>
-            </div>
-          </div>
-        );
     }
 
     const urlRegex = /^(http|https):\/\/[^ "]+$/;
-    if (typeof msg.text === "string" && urlRegex.test(msg.text)) {
+    if (msg.text && typeof msg.text === "string" && urlRegex.test(msg.text)) {
         return (
             <a href={msg.text} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline break-words">
                 {msg.text}

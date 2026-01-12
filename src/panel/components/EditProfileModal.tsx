@@ -141,7 +141,6 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
                 </div>
 
                 <div className="pb-4">
-                    {/* NOMBRE DINÁMICO REPETIDO EN TÍTULO */}
                     <h1 className="text-white text-3xl font-black tracking-tight drop-shadow-xl transition-all">
                         {name || user?.name || "Usuario"} 
                     </h1>

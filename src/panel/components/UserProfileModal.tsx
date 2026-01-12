@@ -17,7 +17,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   initialUser,
   onClose
 }) => {
-  const { currentMembers, allFriends, currentUser } = useChatStore();
+  const { currentMembers, allFriends, currentUser, getOrCreatePrivateChat  } = useChatStore();
   
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -48,6 +48,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     return null;
   }, [userKey, initialUser, currentMembers, allFriends, currentUser, isMe]);
+
+  const handleSendMessage = () => {
+    if (!user) return;
+    getOrCreatePrivateChat(user);
+    onClose();
+  };
 
   if (!isOpen || !userKey || !user) return null;
 
@@ -110,7 +116,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         Editar Perfil
                       </button>
                     ) : (
-                      <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-900/20">
+                      <button onClick={handleSendMessage} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-900/20">
                         Enviar Mensaje
                       </button>
                     )}

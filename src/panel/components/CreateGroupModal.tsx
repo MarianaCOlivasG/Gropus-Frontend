@@ -48,7 +48,6 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
   if (!isOpen) return null;
 
-  // --- VALIDACIONES VISUALES ---
   const hasName = groupName.trim().length > 0;
   const hasDesc = groupDescription.trim().length > 0;
   const isFormValid = hasName && hasDesc;

@@ -10,18 +10,22 @@ export interface Tag {
 }
 
 export interface Message {
-  id?: string;
+  id: string;
   sender: string;
   name: string;
   avatar?: string;
   text: string;
   time: string;
+  created_at: string;
   index?: number;
   role?: string;
+  attachmentType?: "image" | "document" | "pdf" | "file" | null;
   attachmentUrl?: string | null;
-  attachmentType?: 'image' | 'pdf' | 'file' | null;
+  mimeType?: string;
   fileName?: string;
-  created_at: string;
+  fileSize?: string;
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 export interface ChannelItem {
@@ -90,16 +94,21 @@ export interface ChatSlice {
   currentChannelObjects: ChannelItem[];
   messages: Message[];
   isLoadingMessages: boolean;
+  isLoadingMore: boolean;
   pinnedMessages: Record<string, (Message & { index: number }) | null>; 
   mutedChannels: Set<string>;
   socket: any;
-  typingUsers: Record<string, string[]>; 
+  typingUsers: Record<string, string[]>;
+   
 
   previewFile: { url: string; type: 'image' | 'pdf' | string; name: string } | null;
   openFilePreview: (url: string, type: string, name?: string) => void;
   closeFilePreview: () => void;
 
+  getOrCreatePrivateChat: (friend: FriendItem) => Promise<void>;
+  fetchFriends: () => Promise<void>;
   
+  loadMoreMessages: () => Promise<void>;
   loadChat: (chatKey: string) => Promise<void>;
   loadChannel: (channelKey: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;

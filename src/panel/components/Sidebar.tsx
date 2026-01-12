@@ -85,21 +85,46 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       <div className="w-8 h-[2px] bg-gray-700 rounded-lg mb-3"></div>
 
-      {/* --- LISTA CENTRAL --- */}
+      {/*LISTA CENTRAL*/}
       <div className="flex-1 w-full overflow-y-auto scrollbar-hide flex flex-col items-center gap-3">
 
         {/* SECCIÓN AMIGOS */}
         {filteredFriends.map((f) => {
             const isActive = currentChatKey === f.chat;
             const statusColor = f.status === "active" ? "bg-green-500" : "bg-gray-500";
+            const avatarSafe = f.avatar || "";
+            const isImage = avatarSafe.startsWith("data:") || avatarSafe.startsWith("http");
             return (
-            <div key={f.chat} className="relative group w-full flex justify-center">
-                <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-lg transition-all duration-200 ${isActive ? 'h-8' : 'h-2 scale-0 group-hover:scale-100 group-hover:h-4'}`} />
-                <div onClick={() => loadChat(f.chat)} title={f.name} className={`w-12 h-12 cursor-pointer relative rounded-[24px] group-hover:rounded-[16px] transition-all duration-300 ease-out overflow-hidden ${isActive ? "bg-purple-600 rounded-[16px] -translate-y-1 shadow-lg shadow-purple-900/50" : "bg-gray-700 group-hover:bg-purple-600 group-hover:-translate-y-1"}`}>
-                    <img src={f.avatar} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={f.name} />
-                    <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[3px] border-gray-800 ${statusColor}`}></span>
+                <div key={f.chat} className="relative group w-full flex justify-center">
+                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-lg transition-all duration-200 ${isActive ? 'h-8' : 'h-2 scale-0 group-hover:scale-100 group-hover:h-4'}`} />
+                    <div 
+                        onClick={() => loadChat(f.chat)} 
+                        title={f.name} 
+                        className={`
+                            w-12 h-12 cursor-pointer relative 
+                            flex items-center justify-center overflow-hidden 
+                            transition-all duration-300 ease-out 
+                            ${isActive 
+                                ? "bg-purple-600 rounded-[16px] -translate-y-1 shadow-lg shadow-purple-900/50" 
+                                : "bg-gray-700 rounded-[24px] group-hover:rounded-[16px] group-hover:bg-purple-600 group-hover:-translate-y-1"
+                            }
+                        `}
+                    >
+                        {isImage ? (
+                            <img 
+                                src={f.avatar} 
+                                className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                alt={f.name} 
+                            />
+                        ) : (
+                            <span className={`font-bold text-sm ${isActive ? "text-white" : "text-gray-200 group-hover:text-white"}`}>
+                                {f.name.charAt(0).toUpperCase()}
+                            </span>
+                        )}
+                            {/* Indicador de estado */}
+                        <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[3px] border-gray-800 ${statusColor}`}></span>
+                    </div>
                 </div>
-            </div>
             );
         })}
 
@@ -189,7 +214,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       </div>
 
-      {/* Renderizamos el modal de personalización */}
       <EditProfileModal 
         isOpen={isEditProfileOpen} 
         onClose={() => setIsEditProfileOpen(false)} 
